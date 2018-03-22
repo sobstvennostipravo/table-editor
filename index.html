@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>REST Client</title>
+        <meta charset="utf-8">
+        <meta content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" name="viewport">
+        <link href="css/semantic.min.css" rel="stylesheet">
+        <!-- <link href="css/style.css" rel="stylesheet"> -->
+        <script src="js/jquery-3.2.1.min.js"></script>
+        <script src="js/moment.min.js"></script>
+        <script src="js/semantic.min.js"></script>
+        <script src="https://vuejs.org/js/vue.js"></script>
+        <style>
+            .ui.container,
+            .ui.container > .ui.login.grid {
+                height: 100%;
+            }
+            body {
+                background: #dbc9a9 url('img/bg.gif') repeat 50% 0;
+            }
+        </style>
+    </head>
+    <body>
+        <div class="ui container" id="main_app">
+            <div class="ui center aligned grid">
+                <div class="row">
+                    <div class="two wide column">
+                        <img class="ui fluid image" src="img/logo.png">
+                    </div>
+                </div>
+            </div>
+            <div v-if="is_logged_in" class="ui padded grid">
+                <div class="row">
+                    <div class="sixteen wide column">
+                        <main-table v-if="is_table_selected" v-bind:table_id="current_table_id" v-on:show_table_list="show_table_list" v-on:logged_in="set_logged_in"></main-table>
+                        <main-table-list v-on:view_table="set_current_table" v-on:logged_in="set_logged_in" v-else></main-table-list>
+                    </div>
+                </div>
+            </div>
+            <div v-else class="ui padded middle aligned center aligned login grid">
+                <div class="row">
+                    <div class="six wide column">
+                        <main-login v-on:logged_in="set_logged_in"></main-login>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <script type="text/x-template" id="field_value">
+            <div v-if="is_editing" class="ui transparent icon fluid input">
+                <input type="text" ref="input" v-bind:value="value">
+                <i v-on:click="set_new_value" class="checkmark link icon"></i>
+            </div>
+            <div v-else>
+                {{ value }} <i v-on:click="set_edit_state(true)" class="write link icon"></i>
+            </div>
+        </script>
+        <script type="text/x-template" id="main_table">
+            <div v-bind:class="['ui', 'segment', {loading: is_loading}]">
+                <table class="ui very basic celled table">
+                    <thead>
+                        <tr>
+                            <th>Название поля</th>
+                            <th>Значение</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        <tr v-for="(row, index) in rows" v-bind:key="index">
+                            <td>
+                                {{ row[0] }}
+                            </td>
+                            <td>
+                                <field-value v-bind:row_id="index" v-bind:value="row[1]" v-on:changed="on_changed"></field-value>
+                            </td>
+                        </tr>
+                    </tbody>
+                    <tfoot class="full-width">
+                        <tr>
+                            <th colspan="2">
+                                <div class="ui right floated green labeled icon button" v-on:click="on_update">
+                                    <i class="save icon"></i> Сохранить
+                                </div>
+                                <div class="ui labeled icon brown button" v-on:click="on_show_list">
+                                    <i class="left arrow icon"></i> К списку
+                                </div>
+                            </th>
+                        </tr>
+                    </tfoot>
+                </table>
+            </div>
+        </script>
+        <script type="text/x-template" id="main_login">
+            <div v-bind:class="['ui', 'piled', 'left', 'aligned', 'segment', {loading: is_loading}]">
+                <form class="ui form">
+                    <div class="field">
+                        <div class="ui left icon input">
+                            <i class="user icon"></i>
+                            <input v-model="login" v-on:change="is_error = false" placeholder="Логин" type="text">
+                        </div>
+                    </div>
+                    <div class="field">
+                        <div class="ui left icon input">
+                            <i class="lock icon"></i>
+                            <input v-model="password" v-on:change="is_error = false" placeholder="Пароль" type="password">
+                        </div>
+                    </div>
+                    <button v-on:click="on_auth" class="ui blue fluid button" type="button">Авторизация</button>
+                </form>
+                <div v-if="is_error" class="ui negative message">
+                    <div class="header">
+                        Ошибка авторизации
+                    </div>
+                    <p>
+                        Неверные данные для входа
+                    </p>
+                </div>
+            </div>
+        </script>
+        <script type="text/x-template" id="main_table_list">
+            <div v-bind:class="['ui', 'segment', { loading: is_loading }]">
+                <div class="ui selection middle aligned list">
+                    <div v-for="(table_id, index) in table_list" v-on:click="on_table_click(table_id)" class="item">
+                        <i class="table icon"></i>
+                        <div class="content">
+                            <div class="header">{{ table_id }}</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </script>
+        <script type="text/javascript">
+            var API_URLS = {
+                table_set: 'http://185.158.154.144:8009/api/v1/table/',
+                table_get: 'http://185.158.154.144:8009/api/v1/table/',
+                table_list: 'http://185.158.154.144:8009/api/v1/table/ids',
+                auth_token: 'http://185.158.154.144:8009/api/v1/token',
+            };
+            var DEFAULT_LOGGED_IN = true;
+            Vue.component('main-table-list', {
+                template: '#main_table_list',
+                data: function() {
+                    return {
+                        is_loading: false,
+                        table_list: []
+                    };
+                },
+                methods: {
+                    on_table_click: function(table_id) {
+                        console.log(table_id);
+                        this.$emit('view_table', table_id);
+                    },
+                    update_list: function() {
+                        var vm = this;
+                        vm.is_loading = true;
+                        $.ajax({
+                            url: API_URLS.table_list,
+                            method: 'GET',
+                            contentType: 'application/json; charset=UTF-8',
+                            dataType: 'json',
+                            crossDomain: true,
+                            xhrFields: {
+                                withCredentials: true
+                            }
+                        })
+                        .done(function(data) {
+						                console.log(data);
+                            for (var item of data['items']) {
+                                vm.table_list.push(item);
+                            }
+                        }).fail(function(request) {
+                            console.log(request.statusCode());
+                            if (request.status == 401) {
+                                vm.$emit('logged_in', false);
+                            }
+                        }).always(function(request) {
+                            vm.is_loading = false;
+                        });
+
+                        // $.getJSON(url)
+                        // .done(function(data) {
+                        //     for (var item of data) {
+                        //         vm.table_list.push(item);
+                        //     }
+                        // }).fail(function(request) {
+                        //     console.log(request.statusCode());
+                        //     if (request.status == 401) {
+                        //         vm.$emit('logged_in', false);
+                        //     }
+                        // });
+                    }
+                },
+                mounted: function() {
+                    this.update_list();
+
+                }
+            });
+            Vue.component('main-login', {
+                template: '#main_login',
+                data: function() {
+                    return {
+                        login: '',
+                        password: '',
+                        is_error: false,
+                        is_loading: false
+                    };
+                },
+                methods: {
+                    on_auth: function() {
+                        var vm = this;
+                        vm.is_loading = true;
+                        $.ajax({
+                            url: API_URLS.auth_token,
+                            method: 'GET',
+                            contentType: 'application/json; charset=UTF-8',
+                            crossDomain: true,
+                            xhrFields: {
+                                withCredentials: true
+                            },
+                            headers: {
+                                Authorization: 'Basic ' + btoa(vm.login + ':' + vm.password)
+                            }
+                        }).done(function(data) {
+                            vm.$emit('logged_in', true);
+                        }).fail(function(request, status) {
+                            vm.is_error = true;
+                        }).always(function(request) {
+                            vm.is_loading = false;
+                        });
+                    }
+                }
+            });
+            Vue.component('field-value', {
+                template: '#field_value',
+                data: function() {
+                    return {
+                        is_editing: false,
+                    };
+                },
+                methods: {
+                    set_new_value: function() {
+                        this.$emit('changed', this.$refs.input.value, this.row_id);
+                        this.is_editing = false;
+                    },
+                    set_edit_state: function(state) {
+                        this.is_editing = state;
+                    }
+                },
+                props: ['value', 'row_id']
+            });
+            Vue.component('main-table', {
+                template: '#main_table',
+                props: ['table_id'],
+                data: function() {
+                    return {
+                        is_loading: false,
+                        rows: [],
+                    };
+                },
+                methods: {
+                    on_changed: function(new_value, row_id) {
+                        this.$set(this.rows, row_id, [this.rows[row_id][0], new_value]);
+                    },
+                    on_show_list: function() {
+                        this.$emit('show_table_list');
+                    },
+                    on_update: function() {
+                        var vm = this;
+                        var upd_url = API_URLS.table_set + vm.table_id;
+                        var data = {};
+                        this.rows.forEach(function(item) {
+                            data[item[0]] = item[1];
+                        });
+                        vm.is_loading = true;
+                        $.ajax({
+                            url: upd_url,
+                            method: 'POST',
+                            contentType: 'application/json; charset=UTF-8',
+                            data: JSON.stringify(data),
+                            processData: false,
+                            dataType: 'json',
+                            crossDomain: true,
+                            xhrFields: {
+                                withCredentials: true
+                            }
+                        }).fail(function(request) {
+                            if (request.status == 401) {
+                                vm.$emit('logged_in', false);
+                            }
+                            else {
+                                vm.update_table();
+                            }
+                        }).always(function(request) {
+                            vm.is_loading = false;
+                        });
+                    },
+                    update_table: function() {
+                        var url = API_URLS.table_get + this.table_id;
+                        var vm = this;
+                        vm.is_loading = true;
+                        $.ajax({
+                            url: url,
+                            method: 'GET',
+                            contentType: 'application/json; charset=UTF-8',
+                            dataType: 'json',
+                            crossDomain: true,
+                            xhrFields: {
+                                withCredentials: true
+                            }
+                        })
+                        .done(function(data) {
+                            vm.rows = [];
+                            for (var item in data) {
+                                vm.rows.push([item, data[item]]);
+                            }
+                        }).fail(function(request) {
+                            if (request.status == 401) {
+                                vm.$emit('logged_in', false);
+                            }
+                        }).always(function() {
+                            vm.is_loading = false;
+                        });
+                        // $.getJSON(url)
+                        // .done(function(data) {
+                        //     vm.rows = [];
+                        //     for (var item in data) {
+                        //         vm.rows.push([item, data[item]]);
+                        //     }
+                        // }).fail(function(request) {
+                        //     if (request.status == 401) {
+                        //         vm.$emit('logged_in', false);
+                        //     }
+                        // });
+                    }
+                },
+                mounted: function () {
+                    console.log('table mounted');
+                    this.update_table();
+                }
+            });
+            var app = new Vue({
+                el: '#main_app',
+                data: {
+                    is_logged_in: DEFAULT_LOGGED_IN,
+                    is_table_selected: false,
+                    current_table_id: 0
+                },
+                methods: {
+                    set_logged_in: function(state) {
+                        this.is_logged_in = state;
+                    },
+                    set_current_table: function(table_id) {
+                        this.is_table_selected = true;
+                        this.current_table_id = table_id;
+                    },
+                    show_table_list: function() {
+                        this.is_table_selected = false;
+                    }
+                },
+                mounted: function () {
+                    this.$nextTick(function () {
+                        $('.ui.dropdown').dropdown();
+                    })
+                }
+            });
+        </script>
+    </body>
+</html>

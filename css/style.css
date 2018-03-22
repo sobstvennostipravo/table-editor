@@ -1,0 +1,40 @@
+/*.pushable > .pusher,
+.pushable > .ui.sidebar {
+    padding-top: 40px !important;
+}
+
+.pushable > .ui.sidebar {
+    z-index: 100;
+}
+.pusher .dt-table table {
+    width: 100% !important;
+}
+
+.ui.floating.dropdown.upward > .menu {
+    margin-bottom: .5em !important;
+}
+.ui.dropdown .ui.circular.label.empty {
+    width: 0px;
+    height: 0px;
+}
+svg.peity,
+.prediction_02.chart,
+.prediction_24.chart,
+.prediction_46.chart {
+    display: none;
+}
+
+svg.peity {
+    margin-left: 5px;
+}
+
+#prediction_table td .ui.label > i.icon {
+    display: inline !important;
+}*/
+.ui.list .content.btn-padded {
+    padding-top: 0.75em;
+}
+
+.ui.segment.logs {
+    white-space: pre-wrap;
+}
